@@ -7,12 +7,12 @@ from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.x509 import Certificate, DNSName, load_pem_x509_certificate
 
-def gencle(bits:int)->bytes:
+def gencle(bits: int) -> bytes:
     if bits % 8 != 0:
         raise Exception("La taille de la clé doit être un multiple de 8")
     return secrets.token_bytes(bits // 8)
 
-def encRSA(octets:bytes, clepub:rsa.RSAPublicKey)->bytes:
+def encRSA(octets: bytes, clepub: rsa.RSAPublicKey) -> bytes:
     return clepub.encrypt(
         octets,
         padding.OAEP(
@@ -22,37 +22,34 @@ def encRSA(octets:bytes, clepub:rsa.RSAPublicKey)->bytes:
         )
     )
 
-def compresse(texte:str)-> bytes:
+def compresse(texte: str) -> bytes:
     bytestream = texte.encode("utf-8")
     return zlib.compress(bytestream)
 
-def derive(secret:bytes, bits:int)->bytes:
+def derive(secret: bytes, bits: int) -> bytes:
     if bits % 8 != 0:
         raise ValueError("La taille de la clé doit être un multiple de 8")
     kdf_param = secret[:16]
     salt = secret[16:]
     kdf = PBKDF2HMAC(
-    algorithm=hashes.SHA256(),
-    length=(bits // 8),
-    salt=salt,
-    iterations=1_200_000
+        algorithm=hashes.SHA256(),
+        length=(bits // 8),
+        salt=salt,
+        iterations=1_200_000
     )
     return kdf.derive(kdf_param)
 
-def encAES(texte:str, secret:bytes)->bytes:
+def encAES(texte: str, secret: bytes) -> bytes:
     compressed_text = compresse(texte)
-    
     derived_key = derive(secret, 256)
     session_key = derived_key[:16]
     iv = derived_key[16:]
-    
-    cipher = Cipher(algorithms.AES128(session_key), modes.CTR(iv))
+    cipher = Cipher(algorithms.AES(session_key), modes.CTR(iv))
     encryptor = cipher.encryptor()
-    encrypted_data = encryptor.update(compressed_text)
-
+    encrypted_data = encryptor.update(compressed_text) + encryptor.finalize()
     return encrypted_data
 
-def chiffre(message:str, pk:rsa.RSAPublicKey)->bytes:
+def chiffre(message: str, pk: rsa.RSAPublicKey) -> bytes:
     secret = gencle(192)
     encrypted_secret = encRSA(secret, pk)
     ciphertext = encAES(message, secret)
@@ -60,7 +57,7 @@ def chiffre(message:str, pk:rsa.RSAPublicKey)->bytes:
     pickled = pickle.dumps(data)
     return base64.b64encode(pickled)
 
-def sigRSA(message:bytes, sk:rsa.RSAPrivateKey)->bytes:
+def sigRSA(message: bytes, sk: rsa.RSAPrivateKey) -> bytes:
     return sk.sign(
         message,
         padding.PSS(
@@ -70,20 +67,20 @@ def sigRSA(message:bytes, sk:rsa.RSAPrivateKey)->bytes:
         hashes.SHA256()
     )
 
-def HencS(message:str, pk:rsa.RSAPublicKey, sk:rsa.RSAPrivateKey)->bytes:
+def HencS(message: str, pk: rsa.RSAPublicKey, sk: rsa.RSAPrivateKey) -> bytes:
     chiffre64 = chiffre(message, pk)
     signature = sigRSA(chiffre64, sk)
     data = (chiffre64, signature)
     pickled = pickle.dumps(data)
     return base64.b64encode(pickled)
 
-def ReadRSACert(file:str)->rsa.RSAPublicKey:
+def ReadRSACert(file: str) -> rsa.RSAPublicKey:
     with open(file, "rb") as f:
         data = f.read()
         certificate = x509.load_pem_x509_certificate(data)
         return certificate.public_key()
-    
-def readRSA(fic_cle:str):
+
+def readRSA(fic_cle: str):
     with open(fic_cle, 'rb') as file:
         pem = file.read()
         if b"PRIVATE" in pem:
@@ -96,7 +93,6 @@ def readRSA(fic_cle:str):
         return key
 
 def main():
-    # Your main logic here
     if len(sys.argv) < 4:
         print("Il manque au moins un argument")
         sys.exit(1)
@@ -108,8 +104,8 @@ def main():
     pubKeyDest = ReadRSACert(pkDest)
     privKeyDest = readRSA(skExp)
 
-    res = HencS(message, pubKeyDest , privKeyDest )
-    print(res, end="")
+    res = HencS(message, pubKeyDest, privKeyDest)
+    print(res.decode(), end="")
 
 if __name__ == "__main__":
     main()
