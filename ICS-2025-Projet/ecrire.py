@@ -109,7 +109,7 @@ def main():
     privKeyDest = readRSA(skExp)
 
     res = HencS(message, pubKeyDest , privKeyDest )
-    print(res)
+    print(res, end="")
 
 if __name__ == "__main__":
     main()

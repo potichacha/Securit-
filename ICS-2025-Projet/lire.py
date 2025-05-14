@@ -74,7 +74,7 @@ def verRSA(message:bytes, signature:bytes, pk:rsa.RSAPublicKey)->str:
         return False
 
 def HdecS(message64:bytes, pk:rsa.RSAPublicKey, sk:rsa.RSAPrivateKey)->str:
-    decoded = base64.b64decode(message64.encode("ascii"))
+    decoded = base64.b64decode(message64)
     ciphertext, signature = pickle.loads(decoded)
     if verRSA(ciphertext, signature, pk):
         return dechiffre(ciphertext, sk)
@@ -111,9 +111,12 @@ def main():
     privKeyDest = ReadRSACert(pkExp)
     pubKeyDest = readRSA(skDest)
     
+    import base64
+    import pickle
+
+    # Step 1: Read the file
     with open(message, "rb") as f:
-        line = f.read()
-        print(type(line), len(line), line[:20])
+        line = f.readline().strip().decode('utf-8')
 
     res = HdecS(line, pubKeyDest, privKeyDest)
     print(res)
